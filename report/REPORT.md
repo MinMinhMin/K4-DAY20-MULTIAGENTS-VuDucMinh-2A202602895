@@ -4,23 +4,22 @@
 
 | Họ tên | Mã sinh viên | Phần đóng góp |
 |---|---|---|
-| | | |
+|Vũ Đức Minh|2A202602895|Thực hiện toàn bộ lab|
 
-- Nhà cung cấp và mô hình (`LAB_MODEL`, không ghi khóa API), nhiệt độ (`LAB_TEMPERATURE`), `recursion_limit`: `openai:gpt-4.1-mini`, `0`, mặc định `60`.
-- Phiên bản Deep Agents, hệ điều hành, chạy trực tiếp hay trong Docker: `0.7.21`; Linux x86_64; chạy trực tiếp trong `.venv`, không dùng Docker.
-- Số lần chạy tác vụ đã dùng / ngân sách: 12 lần chạy learning thành công (3 skills-auto đầu được chạy lại sau khi sửa skill); 496.509 token trong 9 bản ghi cuối, cộng 178.419 token của bộ skills-auto bị thay thế. Curator và smoke test không được callback runner đo; ngân sách tiền tệ không được cung cấp. Ba lần baseline đầu lỗi DNS và không gọi được mô hình.
-- Commit của tag `freeze`: Chưa tạo; chờ chủ repo commit theo yêu cầu.
+- Mô hình `openai:gpt-4.1-mini`, nhiệt độ `0`, `recursion_limit` mặc định `60`; Deep Agents `0.7.21`, Linux x86_64, chạy trong `.venv`.
+- Runner ghi nhận 1.331.937 token trong 24 kết quả còn lưu và 178.419 token ở ba lượt skills-auto đã thay thế (tổng 1.510.356). Chưa tính ba lần gọi curator, smoke test và ba lượt baseline lỗi DNS; không có số liệu chi phí tiền.
+- Commit giả thuyết: `45ecc9a`. Freeze: commit/tag `34257af` / `freeze`.
 
 ## 2. Giả thuyết (commit TRƯỚC tag `freeze`, Phần 4.0)
 
-- H1 (subagents so với baseline): Dự đoán `subagents` không vượt baseline ổn định trên evaluation. Trên learning, baseline đạt 13/27 check, subagents 8/27; token trung bình tăng từ 43.268 lên 57.871 (+33,8%), trong khi chỉ hai trong ba tác vụ gọi subagent. Lời giao việc có chi tiết nhưng tác vụ data không tạo được `answer.json`, nên điều phối và kiểm chứng đầu ra vẫn là điểm yếu.
-- H2 (skills-auto so với baseline): Dự đoán không có mức tăng ổn định trên evaluation. Với bộ skill cuối, baseline và skills-auto cùng đạt 7/10 ở code, 5/8 ở data và 1/9 ở logs; cả ba lần chạy skills-auto đều `skills_read=0`, trong khi token trung bình cao hơn 48,8%. SkillsBench báo skill tự sinh không có lợi trung bình trong benchmark của họ, còn skill tuyển chọn thủ công tăng trung bình 16,2 điểm phần trăm; kết quả đó không bảo đảm hiệu quả cho mô hình hay bài lab này ([SkillsBench](https://arxiv.org/abs/2602.12670)).
-- H3 (tác vụ học so với tác vụ đánh giá): Dự đoán điểm evaluation trung bình thấp hơn learning vì evaluation dùng dữ liệu mới và bổ sung quy ước chưa gặp trong learning; kỹ năng rút ra từ ít ví dụ có thể khớp với quy ước đã thấy mà không chuyển giao. SkillEvolBench cũng báo lợi ích trên acquisition/replay không ổn định khi chuyển sang frozen deployment có context shift ([SkillEvolBench](https://arxiv.org/abs/2605.24117)).
+- H1 — Mình dự đoán subagents khó vượt baseline trên evaluation. Ở learning, baseline đạt 13/27 check, subagents 8/27 và tốn nhiều token hơn 33,8%. Chỉ hai task gọi subagent; task data vẫn thiếu `answer.json`. Vì vậy mình nghi ngờ khả năng điều phối và kiểm tra đầu ra.
+- H2 — Mình không kỳ vọng skill tự sinh cải thiện điểm ổn định. Với bộ skill cuối, baseline và skills-auto đều đạt 7/10 ở code, 5/8 ở data và 1/9 ở logs; skills-auto không đọc skill lần nào và tốn trung bình nhiều hơn 48,8%. SkillsBench cũng ghi nhận skill tự sinh không tăng điểm trung bình, còn skill được tuyển chọn thủ công tăng 16,2 điểm phần trăm. Kết quả đó chỉ để tham khảo ([SkillsBench](https://arxiv.org/abs/2602.12670)).
+- H3 — Mình nghĩ evaluation có thể thấp hơn learning vì dùng dữ liệu mới và thêm quy ước chưa gặp. Skill rút ra từ ít ví dụ có thể không chuyển giao tốt. SkillEvolBench cũng ghi nhận lợi ích trên acquisition/replay không ổn định khi chuyển sang deployment có context shift ([SkillEvolBench](https://arxiv.org/abs/2605.24117)).
 
 ## 3. Làm quen Deep Agents (Phần 0.3)
 
-1. Công cụ: `ls`, `read_file`, `write_file`, `edit_file`, `delete`, `glob`, `grep`, `execute`, `task`. `execute` chạy lệnh shell.
-2. `task` khởi chạy subagent tạm thời kiểu `general-purpose`; mỗi lần gọi mặc định stateless và chỉ thấy nội dung được gửi trong lời giao việc. Subagent có các công cụ như agent chính.
+1. Agent có `ls`, `read_file`, `write_file`, `edit_file`, `delete`, `glob`, `grep`, `execute` và `task`. Lệnh shell chạy qua `execute`.
+2. `task` gọi subagent `general-purpose`. Mỗi lần gọi độc lập; subagent chỉ biết nội dung được gửi trong lời giao việc, nhưng có bộ công cụ tương tự agent chính.
 3. System prompt mặc định rỗng. Mô tả `task`: “Each invocation is stateless by default, the agent sees only the prompt you give.” Mô tả `execute`: “Executes the shell command in an isolated sandbox and returns combined stdout/stderr.”
 
 ## 4. Đường cơ sở và phân loại lỗi (Phần 2.2)
@@ -42,58 +41,86 @@
 | logs-learn | `rule_sorted_errors` | E | `RULE: errors is sorted by service, then timestamp_utc, ascending` |
 | logs-learn | `rule_schema_header` | E | `RULE: top-level object has schema_version: 2 and generated_by: log-triage` |
 
-Nhận xét: 9/14 check thất bại thuộc nhóm E; 5/14 thuộc nhóm D. `check_breakdown.py` ghi nhận 13/18 check kỹ thuật đạt và 0/9 quy ước đạt. Lỗi chủ đạo là quy ước Acme không có trong yêu cầu tác vụ; các lỗi kỹ thuật còn lại tập trung ở phân tích log (timezone, traceback và repeat count). Skill tổng quát có thể nhắc agent tìm và kiểm tra quy ước trước khi xuất kết quả, nhưng không thể suy ra chính xác quy ước ẩn.
+Trong 14 check trượt, 9 thuộc nhóm E (quy ước) và 5 thuộc nhóm D (kỹ thuật). Breakdown cho thấy agent qua 13/18 check kỹ thuật nhưng 0/9 quy ước. Phần lớn lỗi đến từ quy tắc Acme không nêu trong đề; lỗi kỹ thuật còn lại chủ yếu nằm ở xử lý log, như timezone, traceback và repeat count. Skill có thể nhắc agent kiểm tra quy ước, nhưng không thể đoán chính xác quy tắc bị giấu.
 
 ## 5. Điều kiện `subagents` (Phần 2.3)
 
-- Các subagent đã định nghĩa: `data-analyst` kiểm tra và tính dữ liệu có cấu trúc; `code-log-specialist` sửa code/đọc log và xác minh bằng test; `reviewer-evaluator` kiểm tra độc lập kết quả và bằng chứng.
-- `subagent_calls`: code-learn 0, data-learn 1, logs-learn 1. Hai lời giao việc gọi `general-purpose`, không gọi các subagent chuyên biệt. Lời giao việc có đường dẫn, yêu cầu và định dạng đầu ra cụ thể; tác vụ data vẫn không có `answer.json`, cho thấy agent chính chưa xác nhận kết quả trong sandbox. Không có lời gọi reviewer để kiểm tra độc lập.
-- Tác vụ đạt 8/27 check, thấp hơn baseline 13/27. Token trung bình là 57.871 so với 43.268 ở baseline (+33,8%). Thời gian ghi nhận là 32,6 giây so với 26,0 giây, nhưng hai điều kiện này chạy trước khi timer được sửa nên số giây còn gồm setup. Skills-auto cuối có trung bình 64.363 token và 21,9 giây theo timer mới; không so sánh trực tiếp các số giây khác định nghĩa. Mỗi điều kiện chỉ có ba lần chạy.
+- Mình định nghĩa ba vai trò: `data-analyst` cho dữ liệu, `code-log-specialist` cho code và log, `reviewer-evaluator` để rà soát độc lập.
+- Trong learning, code không gọi subagent; data và logs mỗi task gọi một lần. Cả hai lần đều gọi `general-purpose`, không gọi các vai trò vừa định nghĩa. Dù lời giao việc nêu đường dẫn và đầu ra cần tạo, task data vẫn thiếu `answer.json`; agent chính chưa xác nhận được kết quả. Reviewer cũng không được gọi.
+- Subagents đạt 8/27 check, thấp hơn baseline (13/27), với trung bình 57.871 token so với 43.268 (+33,8%). Thời gian cũ gồm cả setup nên không so trực tiếp với skills-auto. Mỗi condition chỉ có ba lần chạy.
 
 ## 6. Self-evolving: skill do curator sinh (Phần 3)
 
-- Curator chạy ba lần tổng cộng (một lần đầu và hai lần chạy lại). Hai bộ skill sớm bị xóa vì một skill sao chép literal `-999`, bộ còn lại thêm CI/version-control ngoài yêu cầu. Bộ cuối được sinh lại; `tests/test_regressions.py` được giữ vì tài liệu chất lượng lab nêu rõ đây là Acme convention được phép ghi trong skill.
+- Mình gọi curator ba lần. Hai bộ skill đầu bị loại: một bộ chép nguyên sentinel `-999`, bộ kia thêm hướng dẫn CI và version control ngoài yêu cầu. Bộ cuối được sinh lại; `tests/test_regressions.py` được giữ vì guide cho phép nêu quy ước Acme này.
 
 | Skill | Tổng quát hay riêng cho tác vụ học? | Đúng hay sai (nêu chỗ sai nếu có) | Độ dài, `description` và `skills_read` ở Phần 3.4 |
 |---|---|---|---|
-| `enforce-type-annotations` | Tổng quát cho thêm hoặc review hàm public. | Hướng dẫn type hints hợp lý; `mypy` có thể không cài sẵn. | 6 dòng thân; description nêu rõ “Use when adding or reviewing public functions”; `skills_read=0`. |
-| `add-regression-tests-for-fixes` | Tổng quát cho sửa bug; nêu tên tệp regression theo Acme convention đã xác nhận trong guide. | Quy trình kiểm chứng hợp lý; không còn khuyến nghị commit hay thêm CI. | 6 dòng thân; description nêu trigger “Use when fixing bugs”; `skills_read=0`. |
-| `normalize-and-validate-csv-data` | Tổng quát cho CSV: chuẩn hóa, lọc missing/sentinel, khử trùng và xác minh schema. | Hợp lý với phản hồi data; không lặp lại literal sentinel hoặc đáp án. | 8 dòng thân; description nêu rõ “Use when processing CSV input”; `skills_read=0`. |
+| `enforce-type-annotations` | Dùng khi thêm hoặc rà soát hàm public. | Hướng dẫn type hints hợp lý; môi trường có thể chưa cài `mypy`. | 6 dòng; description nêu rõ lúc nào dùng; `skills_read=0`. |
+| `add-regression-tests-for-fixes` | Dùng khi sửa lỗi. | Quy trình kiểm chứng ổn; không còn khuyên thêm CI hay commit. Có nhắc tên file regression theo guide. | 6 dòng; description có trigger rõ; `skills_read=0`. |
+| `normalize-and-validate-csv-data` | Dùng khi xử lý CSV: chuẩn hóa, lọc giá trị thiếu, khử trùng và kiểm tra schema. | Hợp lý với lỗi data; không lặp sentinel hay đáp án. | 8 dòng; description nêu rõ lúc dùng; `skills_read=0`. |
 
 ## 7. Kết quả so sánh (Phần 4.3, 4.4)
 
+Bảng kết quả chính thức trong `report/table.md`:
+
+| Task | baseline | subagents | skills-auto |
+|---|---|---|---|
+| code-learn | 7/10 | 7/10 | 7/10 |
+| data-learn | 5/8 | 0/8 | 3/8 |
+| logs-learn | 1/9 | 1/9 | 1/9 |
+| code-eval | 7/11 | 7/11 | 7/11 |
+| data-eval | 5/9 | 2/9 | 5/9 |
+| logs-eval | 1/10 | 0/10 | 1/10 |
+| **Mean score - learning tasks** | 0.48 | 0.27 | 0.40 |
+| **Mean score - evaluation tasks** | 0.43 | 0.29 | 0.43 |
+| **Mean tokens per run** | 44,144 | 52,314 | 60,535 |
+| **Runs that read a skill** | 0/6 | 0/6 | 0/6 |
+
+Số check kỹ thuật và quy ước theo `scripts/check_breakdown.py`:
 ```text
-Learning-only output from `scripts/check_breakdown.py` (official six-task comparison awaits freeze):
 condition     role    technical  house rules  mean tokens  read a skill
 baseline      learn    13/18         0/9           43,268      0/3
 subagents     learn     8/18         0/9           57,871      0/3
-skills-auto   learn    13/18         0/9           64,363      0/3
-
-Chưa tạo `report/table.md`: evaluation chỉ chạy sau commit `hypotheses` và tag `freeze` do chủ repo.
+skills-auto   learn    11/18         0/9           70,507      0/3
+baseline      eval     13/18         0/12          45,020      0/3
+subagents     eval      9/18         0/12          46,758      0/3
+skills-auto   eval     13/18         0/12          50,563      0/3
 ```
+
+Trên evaluation, baseline và skills-auto cùng đạt `13/30` (43,3%); subagents đạt `9/30` (30%). Cả ba đều trượt 12/12 check quy ước. Với check kỹ thuật, baseline và skills-auto đạt 13/18, subagents đạt 9/18.
 
 ## 8. Phân tích
 
-1. Trên learning, skills-auto đạt 13/27, bằng baseline; subagents đạt 8/27. Cả code (7/10), data (5/8) và logs (1/9) của skills-auto bằng baseline. Evaluation chưa chạy.
-2. Baseline và skills-auto đều đạt 13/18 check kỹ thuật và 0/9 quy ước; các convention checks chưa được giải quyết. Skill có giúp convention mới trên evaluation hay không cần chờ số liệu sau freeze.
-3. Chưa có check nào được chứng minh là do đọc skill mà đạt: `skills_read=0` ở cả ba skills-auto learning runs. `rule_money_in_cents` vẫn thất bại ở data-learn; agent không đọc toàn văn skill, nên không có bằng chứng skill được áp dụng.
-4. Token trung bình trên learning baseline/subagents/skills-auto lần lượt là 43.268/57.871/64.363. Theo tỷ lệ điểm đạt/tổng chia token trung bình, baseline khoảng 1,11×10⁻⁵ điểm/check trên token, skills-auto 0,75×10⁻⁵ và subagents 0,51×10⁻⁵. Vì vậy baseline hiệu quả nhất theo token trong learning; evaluation mới quyết định thứ hạng chính thức. Số giây baseline/subagents gồm setup, còn skills-auto cuối dùng timer chỉ tính agent invocation.
-5. Curator chỉ nhận run role `learn`; nội dung qua `validate_skill` và không chứa marker evaluation. Bộ cuối không còn literal sentinel hoặc khuyến nghị CI/version-control; tên tệp regression là Acme convention được guide cho phép. Chưa thể kết luận về overfitting trước evaluation trên skill đã đóng băng.
-6. Chưa có số liệu sau freeze để so sánh. Bản developmental được lưu nguyên tại `results/skills-auto-dev/`.
+1. Baseline và skills-auto cùng đạt `13/30`; subagents đạt `9/30`. Kết quả này ủng hộ H1 và H2: subagents thấp hơn baseline, còn skills-auto không tăng điểm. Mỗi task chỉ chạy một lần nên chưa thể kết luận đây là khác biệt ổn định.
+2. Cả ba condition đều trượt 12 check quy ước: bốn ở code, bốn ở data và bốn ở logs (các check `rule_` trong breakdown). Xử lý log cũng còn yếu: baseline và skills-auto chỉ đạt `1/10`, subagents `0/10`. Ở data, subagents đạt `2/9`, còn hai condition kia đạt `5/9`.
+3. Runner không ghi nhận lần đọc skill nào ở skills-auto: `0/3` lượt developmental và `0/6` lượt sau freeze. Điểm evaluation của skills-auto trùng baseline ở cả ba task, nên chưa có bằng chứng skill giúp cải thiện. Bonus cũng ghi `skills_read=0/3`, nhưng log chỉ thấy luồng chính, không thấy thao tác bên trong subagent.
+4. Trung bình token trên sáu task là 44.144 với baseline, 52.314 với subagents và 60.535 với skills-auto. Riêng evaluation, các mức lần lượt là 45.020, 46.758 và 50.563 token/lượt; bonus là 65.627. Skills-auto tốn hơn baseline mà không tăng điểm. Bonus bằng điểm baseline nhưng tốn token hơn subagents. Không so sánh thời gian vì timer các lượt chạy cũ tính cả setup.
+5. Curator chỉ nhận kết quả learning; skill được kiểm tra bằng `validate_skill` và bộ marker evaluation. `verify_freeze.py` xác nhận skill không đổi và sáu run skills-auto dùng đúng bản đã đóng băng. Không thấy dấu hiệu rò rỉ evaluation, nhưng do agent không đọc skill nên thí nghiệm chưa cho biết skill có bị overfit hay không.
+6. H3 chỉ đúng với baseline: mean evaluation thấp hơn learning (`0.43` so với `0.48`). Ở subagents và skills-auto, điểm evaluation nhỉnh hơn learning. Cùng bộ skill đạt `13/27` ở lượt developmental và `11/27` khi chạy learning lại sau freeze; code và logs không đổi, còn data giảm từ `5/8` xuống `3/8`. Chênh lệch này cho thấy nhiễu giữa các lần gọi có thể đáng kể.
 
 ## 9. Hạn chế và tính hợp lệ
 
-1. Chỉ có ba tác vụ trong mỗi vai trò, nên một tác vụ bất thường như logs-learn ảnh hưởng lớn đến trung bình.
-2. Mỗi điều kiện chỉ có một lần chạy cho mỗi task. Một bộ skills-auto trung gian từng đạt 18/27, còn bộ cuối đạt 13/27; bộ skill đã đổi và không có full skill read, nên chênh lệch đó không cô lập được hiệu ứng skill hay nhiễu.
-3. Chỉ dùng một mô hình (`openai:gpt-4.1-mini`) và một harness Deep Agents; kết quả không khái quát trực tiếp sang mô hình hoặc nhà cung cấp khác.
-4. Quy ước Acme được giấu trong checker và tác vụ do giảng viên thiết kế; các kết quả phản ánh benchmark nhỏ này, không phải mọi công việc code, data hay log.
+1. Mỗi vai trò chỉ có ba task, mỗi task chạy một lần; chưa đủ để ước lượng khoảng tin cậy. Điểm thấp ở logs cũng kéo trung bình xuống đáng kể.
+2. Thí nghiệm chỉ dùng `openai:gpt-4.1-mini` với một harness Deep Agents, nên chưa thể khái quát sang model hay nhà cung cấp khác.
+3. Các quy ước Acme nằm trong checker chứ không nêu hết trong đề. Kết quả vì vậy phản ánh benchmark nhỏ này, không phải mọi tác vụ code, data hay logs.
+4. Token chưa tính curator, smoke test và các lượt lỗi DNS; chi phí tiền không được ghi. Timer của các lượt developmental cũ cũng tính cả setup.
+5. `skills_read` và `trace.md` chỉ theo dõi agent chính, không ghi hoạt động bên trong subagent. Vì thế chưa đo được đầy đủ việc dùng skill ở bonus.
 
 ## 10. Kết luận
 
-Trong learning, skills-auto và baseline cùng đạt 13/27 check, còn subagents đạt 8/27. Skills-auto dùng trung bình 64.363 token so với 43.268 ở baseline, và không lần chạy nào đọc nội dung SKILL.md. Kết luận về transfer, noise và hiệu quả evaluation sẽ được thêm sau khi chủ repo đóng băng skill và hoàn tất các lần chạy chính thức.
+Baseline và skills-auto cùng đạt `13/30` ở evaluation; subagents đạt `9/30`. Cả ba đều trượt toàn bộ check quy ước. Skills-auto không đọc skill và cũng không vượt baseline, dù tốn nhiều token hơn. Bonus đạt `13/30`, nhưng log chưa cho biết subagent có dùng skill hay không. Với ba task và một lượt chạy mỗi task, kết quả chỉ phản ánh lab này.
 
 ## Phụ lục
 
-- Lệnh đã chạy (theo thứ tự): `.venv/bin/pytest tests/test_02_agent.py -q`; `.venv/bin/pytest tests/test_03_runner.py -q`; `.venv/bin/pytest tests/test_04_curator.py tests/test_01_provided.py -q`; `.venv/bin/pytest -q`; `.venv/bin/python scripts/tour.py`; model smoke test; `lab.runner` baseline/subagents/skills-auto `--tasks learn`; `lab.curator`; `scripts/check_breakdown.py`.
-- Thử thách mở rộng: chưa chạy; bonus 6d chờ tag freeze vì sử dụng evaluation tasks.
-- Ghi chú khác: ba lần baseline ban đầu lỗi DNS trong sandbox, sau đó chạy lại thành công với network access; lần lỗi đầu là hạ tầng, không phải lỗi agent. Chưa tạo commit/tag. `results/skills-auto-dev/` lưu developmental records trước lần chạy chính thức.
+- Freeze: commit `45ecc9a hypotheses` đứng ngay trước commit/tag `34257af freeze skills` / `freeze`. `scripts/verify_freeze.py` in `checked 6 runs of skill conditions: OK`.
+- Bonus 6d, kết quả tách biệt trong `results/bonus-6d/subagents-with-skills/`:
+
+  | Task | Điểm | Token | Lần gọi task | Skill được ghi nhận đọc |
+  |---|---:|---:|---:|---:|
+  | code-eval | 7/11 | 101,087 | 0 | 0 |
+  | data-eval | 5/9 | 79,628 | 1 | 0 |
+  | logs-eval | 1/10 | 16,167 | 0 | 0 |
+
+  Bonus đạt `13/30`, trung bình `65.627` token/lượt; chỉ data-eval gọi subagent. Kiểm tra bằng scripted model xác nhận cả ba custom subagent nhận `/skills/`; danh sách condition chính thức vẫn giữ nguyên. Trace không ghi hội thoại nội bộ, nên số lần đọc skill chỉ tính được ở agent chính.
+- Các lệnh chính được chạy tuần tự: `.venv/bin/python -m lab.runner --condition baseline --tasks eval`; `.venv/bin/python -m lab.runner --condition subagents --tasks eval`; `.venv/bin/python -m lab.runner --condition skills-auto --tasks all`; `.venv/bin/python scripts/verify_freeze.py`; `.venv/bin/python -m lab.compare > report/table.md`; `.venv/bin/python scripts/check_breakdown.py`. Bonus chạy sau freeze trong condition tạm thời và được lưu riêng.
+- Full offline test suite đạt `32 passed` trước freeze. Ba lượt baseline ban đầu lỗi DNS; các lượt chạy lại thành công. `results/skills-auto-dev/` lưu bộ kết quả developmental trước lần chạy chính thức.
